@@ -83,6 +83,7 @@ st.download_button('📥 채점 결과 Excel 다운로드', data=result['excel']
 st.divider()
 st.subheader('💬 AI 평가 도우미')
 st.caption('예: 오답률 4위 문항은? · 그 문제 몇 점이야? · 28번과 유사한 문제 생성 · 900학생의 오답은?')
+st.info('유사문제 **1개 생성**은 평가의 20초 제한을 목표로 합니다. **여러 문항 생성**은 선택 기능으로 더 오래 걸릴 수 있으며, 수업 전 정답·표현을 교사가 확인해 주세요.',icon='ℹ️')
 
 messages = st.session_state.setdefault('messages', [])
 for msg in messages:
@@ -99,6 +100,7 @@ if prompt := st.chat_input('질문을 입력해 주세요'):
                                     messages, st.session_state.get('chat_context'))
             elapsed = time.perf_counter() - start
             st.markdown(answer)
-            st.caption(f'응답 시간: {elapsed:.2f}초' + (' · 20초 초과 주의' if elapsed > 20 else ''))
+            is_multi = ('각각' in prompt or '문제들' in prompt or '문항들' in prompt or '여러' in prompt) and any(w in prompt for w in ('유사','만들','생성','출제'))
+            st.caption(f'응답 시간: {elapsed:.2f}초' + (' · 다중 생성: 평가용 20초 제한과 별도' if is_multi else (' · 평가 기준 20초 초과' if elapsed > 20 else '')))
     st.session_state['chat_context'] = context
     messages.extend([{'role': 'user', 'content': prompt}, {'role': 'assistant', 'content': answer}])

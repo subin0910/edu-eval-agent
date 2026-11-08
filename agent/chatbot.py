@@ -7,6 +7,7 @@ from .question_generator import generate_batch
 from .question_validator import validate_batch, render_problem
 from .question_analyzer import analyze_items
 from .prompts import ROUTER_PROMPT, GENERAL_PROMPT
+from .safety import protected_request, unavailable_request, safe_internal_answer, safe_unavailable_answer, GRADE_TERMS
 
 
 def _student_id(raw, graded):
@@ -23,6 +24,8 @@ def _student_id(raw, graded):
 
 
 def _route(query:str,history:list[dict],context:dict)->Plan:
+    if protected_request(query): return Plan(intent='internal')
+    if unavailable_request(query): return Plan(intent='unsupported')
     plan=direct_plan(query,context)
     if plan is not None:return plan
     # Contextual ordinal: "그중 네 번째 문제" is a ranking selection, not a generic request.
@@ -105,12 +108,15 @@ def reply(query:str, graded, stats:dict, key:dict, question_pdf:bytes,
     context=dict(context or {})
     q=query.strip()
     if not q:return '질문을 입력해 주세요.',context
+    # Enforce data and security boundaries before calling any LLM.
+    if protected_request(q): return safe_internal_answer(),context
+    if unavailable_request(q): return safe_unavailable_answer(q),context
     plan=_route(q,history,context)
     kind=plan.intent
     if kind=='internal':
-        return '내부 지침·비밀키·내부 도구 구성은 안내하지 않습니다. 성적 분석, 학생 조회, 오답 분석 및 유사문제 생성 기능을 지원합니다.',context
+        return safe_internal_answer(),context
     if kind=='unsupported':
-        return '현재 업로드된 자료에는 출석이나 수업 참여 기록이 없어 확인할 수 없습니다.',context
+        return safe_unavailable_answer(q),context
     if kind=='greeting':
         return '안녕하세요! 성적 평균과 중앙값, 학생별 점수, 오답 순위, 문항별 정답·배점, 학습 목표와 유사문제 생성을 도와드립니다.',context
     if kind=='overview':
@@ -154,19 +160,22 @@ def reply(query:str, graded, stats:dict, key:dict, question_pdf:bytes,
         intro=f'요청한 원본 문항 **{", ".join(str(n)+"번" for n in numbers)}**의 학습 목표를 기준으로 생성했습니다.'
         return intro+'\n\n'+_generate_targets(numbers,question_pdf,plan),context
     # Do not hallucinate grades when the intent cannot be resolved.
-    if any(word in q for word in ('학생','점수','성적','정답','오답','문제','문항','시험','평균','취약')):
+    if GRADE_TERMS.search(q):
         return ('질문의 대상과 조건을 정확히 확인하지 못했습니다. 예: "오답 상위 5개", '
                 '"그중 동률을 빼고 각각 1문제", "40번과 유사문제", "28번 학습 포인트".'),context
     try:
         load_dotenv()
         from langchain_openai import ChatOpenAI
-        messages=[('system',GENERAL_PROMPT)]+[(('human' if m['role']=='user' else 'ai'),str(m['content'])[:350])
+        messages=[('system',GENERAL_PROMPT)]+[(('human' if m['role']=='user' else 'ai'),str(m['content'])[:220])
                                                  for m in history[-4:] if m.get('role') in ('user','assistant')]
         messages.append(('human',q))
-        output=ChatOpenAI(model=os.getenv('ROUTER_MODEL','gpt-4.1'),timeout=6,max_retries=0).invoke(messages)
-        return str(output.content),context
+        output=ChatOpenAI(model=os.getenv('ROUTER_MODEL','gpt-4.1'),timeout=12,max_retries=0).invoke(messages)
+        result=output.content
+        if isinstance(result,list):
+            result=' '.join(str(part.get('text','')) for part in result if isinstance(part,dict) and part.get('type')=='text')
+        return str(result or '질문을 조금 더 구체적으로 말씀해 주세요.'),context
     except Exception:
-        return '현재 일반 AI 대화 기능을 사용할 수 없습니다. 성적 조회 기능은 계속 이용할 수 있습니다.',context
+        return ('현재 일반 AI 대화 연결이 원활하지 않습니다. 성적 조회와 오답 분석은 계속 이용할 수 있습니다. ' + '일반 질문은 잠시 후 다시 요청해 주세요.'),context
 
 # Backwards compatibility with previous tests.
 def _rule_route(q:str,context:dict):
