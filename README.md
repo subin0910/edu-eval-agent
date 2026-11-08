@@ -130,7 +130,7 @@ python -m pip install -r requirements.txt
 OPENAI_API_KEY=your_openai_api_key
 ROUTER_MODEL=gpt-4.1
 GENERATOR_MODEL=gpt-5.4
-SINGLE_GENERATION_TIMEOUT=17
+SINGLE_GENERATION_TIMEOUT=25
 BATCH_GENERATION_TIMEOUT=110
 ```
 
@@ -158,6 +158,6 @@ Streamlit Community Cloud에서 GitHub 저장소를 연결하고, 진입 파일�
 - **개발자:** 윤수빈
 - **학번:** 202334498
 - **소속 프로젝트:** 가천대 AI Agent 개발 부트캠프 최종 평가
-- **배포 URL:** 배포 후 위 서비스 링크에 실제 주소 기재
+- **배포 URL:** https://edu-eval-agent.streamlit.app/
 
 *Edu Eval Agent — 채점부터 성적 이해, 다음 학습을 위한 문제 생성까지.*
