@@ -1,0 +1,26 @@
+# Virtual Environment
+.venv/
+venv/
+
+# API Keys and Secrets
+.env
+.env.*
+!.env.example
+.streamlit/secrets.toml
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Local Data
+data/
+*.xlsx
+*.xls
+
+# Generated Files
+outputs/
+
+# OS
+.DS_Store
+Thumbs.db
